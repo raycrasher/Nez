@@ -27,6 +27,7 @@ namespace Nez3D
 		}
 
 		Model _model;
+        public Model Model => _model;
 
 
 		public Model3D(Model model, Texture2D texture = null)
