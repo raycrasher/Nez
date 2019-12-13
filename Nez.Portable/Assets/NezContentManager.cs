@@ -10,6 +10,10 @@ using Microsoft.Xna.Framework;
 using Nez.ParticleDesigner;
 using Nez.Sprites;
 using Nez.Textures;
+using Nez.Tiled;
+using Microsoft.Xna.Framework.Audio;
+using Nez.BitmapFonts;
+
 
 namespace Nez.Systems
 {
@@ -21,6 +25,7 @@ namespace Nez.Systems
 		Dictionary<string, Effect> _loadedEffects = new Dictionary<string, Effect>();
 
 		List<IDisposable> _disposableAssets;
+
 		List<IDisposable> DisposableAssets
 		{
 			get
@@ -30,6 +35,7 @@ namespace Nez.Systems
 					var fieldInfo = ReflectionUtils.GetFieldInfo(typeof(ContentManager), "disposableAssets");
 					_disposableAssets = fieldInfo.GetValue(this) as List<IDisposable>;
 				}
+
 				return _disposableAssets;
 			}
 		}
@@ -91,17 +97,45 @@ namespace Nez.Systems
 		}
 
 		/// <summary>
+		/// loads a SoundEffect either from xnb or directly from a wav. Note that xnb files should not contain the .xnb file
+		/// extension or be preceded by "Content" in the path. wav files should have the file extension and have an absolute
+		/// path or a path starting with "Content".
+		/// </summary>
+		public SoundEffect LoadSoundEffect(string name)
+		{
+			// no file extension. Assumed to be an xnb so let ContentManager load it
+			if (string.IsNullOrEmpty(Path.GetExtension(name)))
+				return Load<SoundEffect>(name);
+
+			if (LoadedAssets.TryGetValue(name, out var asset))
+			{
+				if (asset is SoundEffect sfx)
+				{
+					return sfx;
+				}
+			}
+
+			using (var stream = Path.IsPathRooted(name) ? File.OpenRead(name) : TitleContainer.OpenStream(name))
+			{
+				var sfx = SoundEffect.FromStream(stream);
+				LoadedAssets[name] = sfx;
+				DisposableAssets.Add(sfx);
+				return sfx;
+			}
+		}
+
+		/// <summary>
 		/// loads a Tiled map
 		/// </summary>
-		public Tiled.TmxMap LoadTiledMap(string name)
+		public TmxMap LoadTiledMap(string name)
 		{
 			if (LoadedAssets.TryGetValue(name, out var asset))
 			{
-				if (asset is Tiled.TmxMap map)
+				if (asset is TmxMap map)
 					return map;
 			}
 
-			var tiledMap = new Tiled.TmxMap(name);
+			var tiledMap = new TmxMap().LoadTmxMap(name);
 
 			LoadedAssets[name] = tiledMap;
 			DisposableAssets.Add(tiledMap);
@@ -145,6 +179,25 @@ namespace Nez.Systems
 			DisposableAssets.Add(atlas);
 
 			return atlas;
+		}
+
+		/// <summary>
+		/// Loads a BitmapFont
+		/// </summary>
+		public BitmapFont LoadBitmapFont(string name)
+		{
+			if (LoadedAssets.TryGetValue(name, out var asset))
+			{
+				if (asset is BitmapFont bmFont)
+					return bmFont;
+			}
+
+			var font = BitmapFontLoader.LoadFontFromFile(name);
+
+			LoadedAssets.Add(name, font);
+			DisposableAssets.Add(font);
+
+			return font;
 		}
 
 		/// <summary>
@@ -382,6 +435,7 @@ namespace Nez.Systems
 						return kv.Key;
 				}
 			}
+
 			return null;
 		}
 
